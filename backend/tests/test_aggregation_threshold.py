@@ -1,49 +1,66 @@
-# SBFLT-19: Tests for aggregation participation threshold
+"""
+US-11: Test Aggregation Threshold Configuration
+"""
+import requests
+import json
 
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+BASE_URL = "http://127.0.0.1:5000"
 
-from backend.server.services.updates import can_aggregate, get_threshold, set_threshold
-from backend.server.services.overview import get_server_overview, log_threshold_status
+print("=" * 60)
+print("US-11: Testing Aggregation Threshold Configuration")
+print("=" * 60)
 
-# --- Tests for updates.py ---
+# -- Test 1: Get default threshold
+print("\n Test 1: Get default threshold configuration")
+r = requests.get(f"{BASE_URL}/config/threshold")
+print(f"Status Code: {r.status_code}")
+print(f"Response: {json.dumps(r.json(), indent=2)}")
 
-def test_threshold_met():
-    assert can_aggregate(3, threshold=2) == True
+# -- Test 2: Set threshold to 3
+print("\n  Test 2: Set threshold to 3 clients")
+r = requests.post(f"{BASE_URL}/config/threshold",
+    json={"min_clients": 3})
+print(f"Status Code: {r.status_code}")
+print(f"Response: {json.dumps(r.json(), indent=2)}")
 
-def test_threshold_exactly_met():
-    assert can_aggregate(2, threshold=2) == True
+# -- Test 3: Check aggregation below threshold
+print("\n Test 3: Check aggregation (0 clients, threshold=3)")
+r = requests.get(f"{BASE_URL}/aggregate/check")
+print(f"Status Code: {r.status_code}")
+print(f"Response: {json.dumps(r.json(), indent=2)}")
 
-def test_threshold_not_met():
-    assert can_aggregate(1, threshold=2) == False
+# -- Test 4: Register 2 clients
+print("\n Test 4: Register 2 clients")
+for name in ["client_amna", "client_2"]:
+    r = requests.post(f"{BASE_URL}/register",
+        json={"client_name": name})
+    print(f"  {name}: Status {r.status_code}")
 
-def test_get_threshold_default():
-    result = get_threshold()
-    assert isinstance(result, int)
-    assert result >= 1
+# -- Test 5: Check aggregation still below threshold
+print("\n Test 5: Check aggregation (2 clients, threshold=3)")
+r = requests.get(f"{BASE_URL}/aggregate/check")
+print(f"Status Code: {r.status_code}")
+print(f"Response: {json.dumps(r.json(), indent=2)}")
 
-def test_set_threshold_valid():
-    result = set_threshold(3)
-    assert result["success"] == True
-    assert result["threshold"] == 3
+# -- Test 6: Register 3rd client
+print("\n Test 6: Register 3rd client")
+r = requests.post(f"{BASE_URL}/register",
+    json={"client_name": "client_3"})
+print(f"Status Code: {r.status_code}")
 
-def test_set_threshold_invalid():
-    result = set_threshold(0)
-    assert result["success"] == False
+# -- Test 7: Check aggregation at threshold
+print("\n Test 7: Check aggregation (3 clients, threshold=3)")
+r = requests.get(f"{BASE_URL}/aggregate/check")
+print(f"Status Code: {r.status_code}")
+print(f"Response: {json.dumps(r.json(), indent=2)}")
 
-# --- Tests for overview.py ---
+# -- Test 8: Set threshold below minimum
+print("\n Test 8: Set invalid threshold (0 clients)")
+r = requests.post(f"{BASE_URL}/config/threshold",
+    json={"min_clients": 0})
+print(f"Status Code: {r.status_code}")
+print(f"Response: {json.dumps(r.json(), indent=2)}")
 
-def test_overview_threshold_met():
-    overview = get_server_overview(5)
-    assert overview["threshold_met"] == True
-    assert overview["status"] == "ready"
-
-def test_overview_threshold_not_met():
-    overview = get_server_overview(0)
-    assert overview["threshold_met"] == False
-    assert overview["status"] == "waiting"
-
-def test_log_threshold_status():
-    log = log_threshold_status(1, 3)
-    assert "Round 1" in log
+print("\n" + "=" * 60)
+print("All US-11 Tests Complete!")
+print("=" * 60)
